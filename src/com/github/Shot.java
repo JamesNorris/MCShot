@@ -17,8 +17,8 @@ public class Shot {
         List<Hit> hits = new ArrayList<Hit>();
         for (HitBox hitBox : hitBoxes) {
             hitBox.update();
-            float fromYaw = 360 % from.getYaw();
-            float fromPitch = 360 % from.getPitch();
+            float fromYaw = from.getYaw() % 360;
+            float fromPitch = from.getPitch() % 360;
             // making sure the center location is within range
             if (hitBox.getCenter().distanceSquared(from) > Math.pow(data.getDistanceToTravel(), 2)) {
                 continue;
