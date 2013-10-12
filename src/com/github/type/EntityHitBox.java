@@ -10,6 +10,7 @@ public class EntityHitBox extends HitBox {
 
     public EntityHitBox(Entity entity, Location origin, Location center, float yawRotation) {
         super(origin, center, yawRotation);
+        this.entity = entity;
     }
     
     public Entity getEntity() {
