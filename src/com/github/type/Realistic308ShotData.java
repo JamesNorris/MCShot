@@ -16,7 +16,7 @@ public class Realistic308ShotData implements ShotData {
     @Override public float getWindSpeedMPH(World world) {//TODO check for biomes
         float windSpeed = random.nextInt(2);
         if (world.hasStorm()) {
-            windSpeed += random.nextInt(5) * random.nextInt(6);
+            windSpeed += random.nextInt(5);
         }
         return windSpeed;
     }

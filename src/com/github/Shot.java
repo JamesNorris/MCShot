@@ -7,13 +7,15 @@ import org.bukkit.Location;
 
 public class Shot {
     private final Location from;
+    private ShotData data;
 
-    public Shot(Location from) {
+    public Shot(Location from, ShotData data) {
         this.from = from;
+        this.data = data;
     }
 
     // TODO - Checking for obstacles
-    public List<Hit> shoot(ShotData data, List<HitBox> hitBoxes) {
+    public List<Hit> shoot(List<HitBox> hitBoxes) {
         List<Hit> hits = new ArrayList<Hit>();
         for (HitBox hitBox : hitBoxes) {
             hitBox.update();
@@ -28,7 +30,7 @@ public class Shot {
             // accounting for wind speed/direction
             float windCompassDirection = data.getWindCompassDirection(from.getWorld());
             float windSpeed = data.getWindSpeedMPH(from.getWorld());
-            fromYaw += (windCompassDirection > fromYaw ? 1 : windCompassDirection < fromYaw ? -1 : 0) * windCompassDirection / 60 * windSpeed;
+            fromYaw += (windCompassDirection > fromYaw ? 1 : windCompassDirection < fromYaw ? -1 : 0) * windSpeed;
             fromYaw %= 360;
             Location boxOrigin = hitBox.getOrigin();
             int[] orderClockwise = new int[] {0, 1, 4, 3};
@@ -44,8 +46,8 @@ public class Shot {
                     oppositeSideCorner = hitBox.getCorner((i + exitCornerClockwiseAmount) % 3);
                 }
             }
-            Location entrance = getHit(thisSideCorner, data, hitBox, fromYaw, fromPitch, true);
-            Location exit = getHit(oppositeSideCorner, data, hitBox, fromYaw, fromPitch, false);
+            Location entrance = getProjectileLocation(thisSideCorner, data, hitBox, fromYaw, fromPitch, true);
+            Location exit = getProjectileLocation(oppositeSideCorner, data, hitBox, fromYaw, fromPitch, false);
             // hit detection and reaction
             if (entrance.getX() - boxOrigin.getX() <= hitBox.getX() && entrance.getY() - boxOrigin.getY() <= hitBox.getY() && entrance.getZ() - boxOrigin.getZ() <= hitBox.getZ()) {
                 hits.add(new Hit(from, entrance, exit, hitBox, data));
@@ -54,7 +56,7 @@ public class Shot {
         return hits;
     }
 
-    private Location getHit(Location thisSideCorner, ShotData data, HitBox hitBox, float fromYaw, float fromPitch, boolean variance) {
+    private Location getProjectileLocation(Location thisSideCorner, ShotData data, HitBox hitBox, float fromYaw, float fromPitch, boolean variance) {
         double deltaFromToSideCornerX = from.getX() - thisSideCorner.getX();
         double deltaFromToSideCornerZ = from.getZ() - thisSideCorner.getZ();
         double xzDistFromSideCorner = Math.sqrt(Math.pow(deltaFromToSideCornerX, 2) + Math.pow(deltaFromToSideCornerZ, 2));
