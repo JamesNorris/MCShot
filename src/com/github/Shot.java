@@ -13,6 +13,34 @@ public class Shot {
         this.from = from;
         this.data = data;
     }
+    
+    public List<HitBox> arrangeClosest(List<HitBox> hitBoxes) {
+        return arrangeClosest(from, hitBoxes);
+    }
+    
+    public static List<HitBox> arrangeClosest(Location from, List<HitBox> hitBoxes) {
+        List<HitBox> arranged = new ArrayList<HitBox>();
+        for (int i = 0; i < hitBoxes.size(); i++) {
+            HitBox closest = getClosest(from, hitBoxes);
+            hitBoxes.remove(closest);
+            arranged.add(closest);
+        }
+        return arranged;
+    }
+    
+    public HitBox getClosest(List<HitBox> hitBoxes) {
+        return getClosest(from, hitBoxes);
+    }
+    
+    public static HitBox getClosest(Location from, List<HitBox> hitBoxes) {
+        HitBox closest = hitBoxes.get(0);
+        for (HitBox hitBox : hitBoxes) {
+            if (hitBox.getCenter().distance(from) < closest.getCenter().distance(from)) {
+                closest = hitBox;
+            }
+        }
+        return closest;
+    }
 
     // TODO - Checking for obstacles
     public List<Hit> shoot(List<HitBox> hitBoxes) {
@@ -32,7 +60,6 @@ public class Shot {
             float windSpeed = data.getWindSpeedMPH(from.getWorld());
             fromYaw += (windCompassDirection > fromYaw ? 1 : windCompassDirection < fromYaw ? -1 : 0) * windSpeed;
             fromYaw %= 360;
-            Location boxOrigin = hitBox.getOrigin();
             int[] orderClockwise = new int[] {0, 1, 4, 3};
             Location thisSideCorner = hitBox.getCorner(0);
             Location oppositeSideCorner = hitBox.getCorner(0);
@@ -46,29 +73,59 @@ public class Shot {
                     oppositeSideCorner = hitBox.getCorner((i + exitCornerClockwiseAmount) % 3);
                 }
             }
-            Location entrance = getProjectileLocation(thisSideCorner, data, hitBox, fromYaw, fromPitch, true);
-            Location exit = getProjectileLocation(oppositeSideCorner, data, hitBox, fromYaw, fromPitch, false);
+            Location entrance = getProjectileLocation(thisSideCorner, data, hitBox, fromYaw, fromPitch);
+            double distance = entrance.distance(from);
+            double deltaX = data.getDeltaX(distance, fromYaw);
+            double deltaY = data.getDeltaY(distance, fromPitch);
+            double deltaZ = data.getDeltaZ(distance, fromYaw);
+            entrance.add(deltaX, deltaY, deltaZ);
+            Location exit = getProjectileLocation(oppositeSideCorner, data, hitBox, deltaX, deltaY, deltaZ, fromYaw, fromPitch);
             // hit detection and reaction
-            if (entrance.getX() - boxOrigin.getX() <= hitBox.getX() && entrance.getY() - boxOrigin.getY() <= hitBox.getY() && entrance.getZ() - boxOrigin.getZ() <= hitBox.getZ()) {
+            boolean hitX = entrance.getX() <= hitBox.getHighestX() && entrance.getX() >= hitBox.getLowestX();
+            boolean hitY = entrance.getY() <= hitBox.getHighestY() && entrance.getY() >= hitBox.getLowestY();
+            boolean hitZ = entrance.getZ() <= hitBox.getHighestZ() && entrance.getZ() >= hitBox.getLowestZ();
+            if (hitX && hitY && hitZ) {
                 hits.add(new Hit(from, entrance, exit, hitBox, data));
             }
         }
         return hits;
     }
 
-    private Location getProjectileLocation(Location thisSideCorner, ShotData data, HitBox hitBox, float fromYaw, float fromPitch, boolean variance) {
-        double deltaFromToSideCornerX = from.getX() - thisSideCorner.getX();
-        double deltaFromToSideCornerZ = from.getZ() - thisSideCorner.getZ();
+    private Location getProjectileLocation(Location thisSideCorner, ShotData data, HitBox hitBox, float fromYaw, float fromPitch) {
+        return getProjectileLocation(thisSideCorner, data, hitBox, 0, 0, 0, fromYaw, fromPitch);
+    }
+    
+    private Location getProjectileLocation(Location thisSideCorner, ShotData data, HitBox hitBox, double addX, double addY, double addZ, float fromYaw, float fromPitch) {
+        double deltaFromToSideCornerX = thisSideCorner.getX() - from.getX();
+        double deltaFromToSideCornerY = thisSideCorner.getY() - from.getY();
+        double deltaFromToSideCornerZ = thisSideCorner.getZ() - from.getZ();
         double xzDistFromSideCorner = Math.sqrt(Math.pow(deltaFromToSideCornerX, 2) + Math.pow(deltaFromToSideCornerZ, 2));
-        double yawSubtractionToSideCorner = Math.atan2(deltaFromToSideCornerZ, deltaFromToSideCornerX) * 180 / Math.PI;
-        float deltaYaw = Math.abs(hitBox.getYawRotation() - fromYaw);
-        double originDeltaYaw = 180 - (yawSubtractionToSideCorner + deltaYaw);
-        double xzHitDistance = (xzDistFromSideCorner * (Math.sin(Math.toRadians(originDeltaYaw))) / Math.sin(Math.toRadians(deltaYaw)));
-        double deltaX = (xzHitDistance * (Math.sin(Math.toRadians(180 - (fromYaw + 90)))) / Math.sin(Math.toRadians(90)));
-        double deltaY = (xzDistFromSideCorner * (Math.sin(Math.toRadians(-fromPitch))) / Math.sin(Math.toRadians(90 - fromPitch)));
-        double deltaZ = (xzHitDistance * (Math.sin(Math.toRadians(fromYaw))) / Math.sin(Math.toRadians(90)));
-        double hitDistance = (xzHitDistance * (Math.sin(Math.toRadians(90))) / Math.sin(Math.toRadians(fromYaw)));
-        Location hit = from.clone().add(deltaX + (variance ? data.getDeltaX(hitDistance, fromYaw) : 0), deltaY + (variance ? data.getDeltaY(hitDistance, fromPitch) : 0), deltaZ + (variance ? data.getDeltaZ(hitDistance, fromYaw) : 0));
+        double yawToSideCorner = Math.atan2(deltaFromToSideCornerX, deltaFromToSideCornerZ) * 180 / Math.PI;// flipped x and z from normal
+        double theta1 = yawToSideCorner - fromYaw;
+        double theta2 = yawToSideCorner - theta1;
+        double outerAngle = 180 - yawToSideCorner - 90;// previously theta1
+        double outerAngleInShotCone = outerAngle + 90 + hitBox.getYawRotation();
+        double lastAngleInShotCone = 180 - theta1 - outerAngleInShotCone;
+        double xzDistanceFromHit = (xzDistFromSideCorner * Math.sin(Math.toRadians(outerAngleInShotCone))) / Math.sin(Math.toRadians(lastAngleInShotCone));
+        double deltaX = xzDistanceFromHit * Math.sin(Math.toRadians(theta2));// leaves out sin 90 because its just equal to 1...
+        double deltaZ = xzDistanceFromHit * Math.sin(Math.toRadians(90 - theta2));// leaves out sin 90 because its just equal to 1...
+        double xyzDistFromSideCorner = Math.sqrt(Math.pow(xzDistFromSideCorner, 2) + Math.pow(deltaFromToSideCornerY, 2));
+        double theta3 = Math.atan2(Math.abs(deltaFromToSideCornerY), xzDistFromSideCorner) * 180 / Math.PI;
+        double theta4 = Math.abs(fromPitch) - theta3;
+        double theta5 = 90 + theta3;
+        double theta6 = 180 - theta4 - theta5;
+        double hitDistance = (xyzDistFromSideCorner * Math.sin(Math.toRadians(theta5))) / Math.sin(Math.toRadians(theta6));
+        double deltaY = hitDistance * Math.sin(Math.toRadians(Math.abs(fromPitch)));// leaves out sin 90 because its just equal to 1...
+        if (deltaFromToSideCornerX < 0 && deltaX > 0) {
+            deltaX *= -1;
+        }
+        if (fromPitch > 0 && deltaY > 0) {// pitch in minecraft is backwards, normally it would be fromPitch < 0
+            deltaY *= -1;
+        }
+        if (deltaFromToSideCornerZ < 0 && deltaZ > 0) {
+            deltaZ *= -1;
+        }
+        Location hit = from.clone().add(deltaX + addX, deltaY + addY, deltaZ + addZ);
         hit.setYaw(fromYaw);
         hit.setPitch(fromPitch);
         return hit;

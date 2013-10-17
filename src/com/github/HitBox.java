@@ -7,12 +7,11 @@ import java.util.UUID;
 import org.bukkit.Location;
 
 public class HitBox {
-    public static final int LOW_X_Y_Z = 0, HIGH_X_LOW_Y_Z = 1, HIGH_Y_LOW_X_Z = 2, HIGH_Z_LOW_X_Y = 3, HIGH_X_Z_LOW_Y = 4, HIGH_X_Y_LOW_Z = 5, HIGH_X_Y_Z = 6, HIGH_Y_Z_LOW_X = 7;
     private float yawRotation;
     private double x, y, z;
     private double[][] additions;
     private Location center;
-    private List<Location> corners = new ArrayList<Location>();
+    private Location[] corners = new Location[8];
     private List<DataZone> dataZones = new ArrayList<DataZone>();
     private UUID uuid = UUID.randomUUID();
 
@@ -41,46 +40,36 @@ public class HitBox {
      */
     
     /**
-     * An invisible box in the world that can be hit with a shot.
+     * 
+     * An invisible box in the world that can be hit with {@code Shot.shoot(List<HitBox> hitBoxes)}.
      * Additionally, {@link DataZone} instances can be added to this, 
      * allowing for different damage and thickness on an area of the box.
      * 
-     * @param origin The current location of the origin of this box in the world TODO add a constructor with length, width, height, and have the origin found instead of provided
-     * @param center The center of the prism
+     * @param center The exact center of the hit box
+     * @param length The length (z axis) of the hit box
+     * @param width The width (x axis) of the hit box
+     * @param height The height (y axis) of the hit box
      * @param yawRotation The rotation around the center of the origin (or any other point)
      */
-    public HitBox(Location origin, Location center, float yawRotation) {
-        double x = origin.getX() - center.getX();
-        double y = origin.getY() - center.getY();
-        double z = origin.getZ() - center.getZ();
-        
-        additions = new double[][] {{0, 0, 0}, {x, 0, 0}, {0, y, 0}, {0, 0, z}, {x, 0, z}, {x, y, 0}, {x, y, z}, {0, y, z}};
-        for (int i = 0; i < 8; i++) {
-            double[] addition = additions[i];
-            
-            double xPrime = center.getX() + (center.getX() - (origin.getX() + addition[0])) * Math.cos(Math.toRadians(yawRotation)) - (center.getZ() - (origin.getZ() + addition[2])) * Math.sin(Math.toRadians(yawRotation));
-            double zPrime = center.getZ() + (center.getX() - (origin.getX() + addition[0])) * Math.sin(Math.toRadians(yawRotation)) + (center.getZ() - (origin.getZ() + addition[2])) * Math.cos(Math.toRadians(yawRotation));
-            
-            corners.add(new Location(center.getWorld(), xPrime, origin.getY() + addition[1], zPrime, yawRotation, 0));
-        }
-        
+    public HitBox(Location center, double length, double width, double height, float yawRotation) {  
+        corners[0] = center.clone().add(-1 * width / 2, -1 * height / 2, -1 * length / 2);
         this.center = center;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.yawRotation %= 360;
+        this.x = width;
+        this.y = height;
+        this.z = length;
+        rotate(yawRotation);
     }
     //@formatter:on
-    public List<Location> getCorners() {
+    public Location[] getCorners() {
         return corners;
     }
 
     public Location getCorner(int corner) {
-        return corners.get(corner);
+        return corners[corner];
     }
-    
+
     public Location getOrigin() {
-        return corners.get(0);
+        return corners[0];
     }
 
     public List<DataZone> getDataZones() {
@@ -134,15 +123,14 @@ public class HitBox {
     }
 
     public void rotate(float degrees) {
-        Location origin = getCorner(0);
+        Location origin = corners[0];
         this.yawRotation = (yawRotation + degrees) % 360;
-        int cornersSize = corners.size();
-        corners.clear();
-        for (int i = 0; i < cornersSize; i++) {
+        additions = new double[][] { {0, 0, 0}, {x, 0, 0}, {0, y, 0}, {0, 0, z}, {x, 0, z}, {x, y, 0}, {x, y, z}, {0, y, z}};
+        for (int i = 0; i < 8; i++) {
             double[] addition = additions[i];
             double xPrime = center.getX() + (center.getX() - (origin.getX() + addition[0])) * Math.cos(Math.toRadians(yawRotation)) - (center.getZ() - (origin.getZ() + addition[2])) * Math.sin(Math.toRadians(yawRotation));
             double zPrime = center.getZ() + (center.getX() - (origin.getX() + addition[0])) * Math.sin(Math.toRadians(yawRotation)) + (center.getZ() - (origin.getZ() + addition[2])) * Math.cos(Math.toRadians(yawRotation));
-            corners.add(new Location(center.getWorld(), xPrime, origin.getY() + addition[1], zPrime, yawRotation, 0));
+            corners[i] = new Location(center.getWorld(), xPrime, origin.getY() + addition[1], zPrime, yawRotation, 0);
         }
     }
 
@@ -150,8 +138,8 @@ public class HitBox {
         double deltaX = center.getX() - this.center.getX();
         double deltaY = center.getY() - this.center.getY();
         double deltaZ = center.getZ() - this.center.getZ();
-        for (int i = 0; i < corners.size(); i++) {
-            corners.get(i).add(deltaX, deltaY, deltaZ);
+        for (int i = 0; i < 8; i++) {
+            corners[i].add(deltaX, deltaY, deltaZ);
         }
         this.center = center;
     }
@@ -170,6 +158,62 @@ public class HitBox {
 
     public double getZ() {
         return z;
+    }
+    
+    protected void setY(double y) {
+        int[] toChange = new int[] {2, 5, 6, 7};
+        for (int i : toChange) {
+            corners[i].setY(corners[0].getY() + y);
+        }
+        this.y = y;
+    }
+
+    public double getHighestX() {
+        double highestX = Double.MIN_VALUE;
+        for (Location location : corners) {
+            if (location.getX() > highestX) {
+                highestX = location.getX();
+            }
+        }
+        return highestX;
+    }
+
+    public double getHighestY() {
+        return corners[0].getY() + y;
+    }
+
+    public double getHighestZ() {
+        double highestZ = Double.MIN_VALUE;
+        for (Location location : corners) {
+            if (location.getZ() > highestZ) {
+                highestZ = location.getZ();
+            }
+        }
+        return highestZ;
+    }
+
+    public double getLowestX() {
+        double lowestX = Double.MAX_VALUE;
+        for (Location location : corners) {
+            if (location.getX() < lowestX) {
+                lowestX = location.getX();
+            }
+        }
+        return lowestX;
+    }
+
+    public double getLowestY() {
+        return corners[0].getY();
+    }
+
+    public double getLowestZ() {
+        double lowestZ = Double.MAX_VALUE;
+        for (Location location : corners) {
+            if (location.getZ() < lowestZ) {
+                lowestZ = location.getZ();
+            }
+        }
+        return lowestZ;
     }
 
     public float getYawRotation() {
