@@ -2,7 +2,7 @@ MCShot
 ======
 
 A library that works to recreate a realistic bullet, or other custom projectile within Minecraft. 
-MCShot provides no functionality to create visual effects, sounds, or input.
+MCShot provides no functionality to create visual effects, sounds, or input.  
 All issues, source code, and repository functions are handled by [GitHub](https://github.com/).  
 Chat, calling, and instant messaging are done via [Skype](http://www.skype.com/en/).
 
