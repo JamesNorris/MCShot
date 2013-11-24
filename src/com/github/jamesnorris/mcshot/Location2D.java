@@ -1,4 +1,4 @@
-package com.github.jamesnorris;
+package com.github.jamesnorris.mcshot;
 
 public class Location2D {
     private double x, y;

@@ -1,0 +1,6 @@
+#surefire
+#Sun Nov 24 15:20:23 EST 2013
+altDeploymentRepository=snapshot-repo\:\:default\:\:file\:C\:/Users/James/git/MVN/releases
+user.dir=C\:\\Users\\James\\git\\MCShot
+localRepository=C\:\\Users\\James\\.m2\\repository
+basedir=C\:\\Users\\James\\git\\MCShot

@@ -1,4 +1,4 @@
-package com.github.jamesnorris;
+package com.github.jamesnorris.mcshot;
 
 public class LineSegment2D {
     public static Location2D getIntersect(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4) {

@@ -1,4 +1,4 @@
-package com.github.jamesnorris.type;
+package com.github.jamesnorris.mcshot.type;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import org.bukkit.World;
 
-import com.github.jamesnorris.ShotData;
+import com.github.jamesnorris.mcshot.ShotData;
 
 public class Realistic308ShotData implements ShotData {
     private Random random = new Random();

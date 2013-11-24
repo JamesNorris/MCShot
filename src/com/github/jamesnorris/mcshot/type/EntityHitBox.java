@@ -1,9 +1,9 @@
-package com.github.jamesnorris.type;
+package com.github.jamesnorris.mcshot.type;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 
-import com.github.jamesnorris.HitBox;
+import com.github.jamesnorris.mcshot.HitBox;
 
 public class EntityHitBox extends HitBox {
     private Entity entity;

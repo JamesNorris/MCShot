@@ -1,4 +1,4 @@
-package com.github.jamesnorris;
+package com.github.jamesnorris.mcshot;
 
 import java.util.UUID;
 
