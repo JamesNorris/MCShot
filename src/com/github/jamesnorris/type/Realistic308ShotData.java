@@ -1,4 +1,4 @@
-package com.github.type;
+package com.github.jamesnorris.type;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import org.bukkit.World;
 
-import com.github.ShotData;
+import com.github.jamesnorris.ShotData;
 
 public class Realistic308ShotData implements ShotData {
     private Random random = new Random();
