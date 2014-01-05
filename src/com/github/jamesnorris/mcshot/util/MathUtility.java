@@ -1,4 +1,4 @@
-package com.github.jamesnorris.mcshot;
+package com.github.jamesnorris.mcshot.util;
 
 public class MathUtility {
     public static double absDegrees(double degrees) {
@@ -16,5 +16,9 @@ public class MathUtility {
 
     public static boolean overlap1D(double low1, double high1, double low2, double high2) {
         return low1 <= low2 ? low2 <= high1 : low1 <= high2;
+    }
+    
+    public static double logBase(double base, double number) {
+        return Math.log(number) / Math.log(base);
     }
 }

@@ -1,6 +1,7 @@
 package com.github.jamesnorris.mcshot;
 
 import org.bukkit.World;
+import org.bukkit.block.Biome;
 
 public interface ShotData {
     public double getDamage(double distance);
@@ -12,15 +13,21 @@ public interface ShotData {
 
     public double getDeltaZ(double distance, float originalYaw);
 
+    /**
+     * The distance to travel, in blocks from the shot location. Blocks can be expressed as meters in this situation.
+     * @return The distance to travel, in blocks or meters.
+     */
     public double getDistanceToTravel();
 
-    public double getPenetration(double current, double distance);
+    public double getInitialPenetration();
+
+    public double getPenetration(double distance);
 
     public float getSpeedBPS(double distance);
-
-    public double getStartingPenetration();
 
     public float getWindCompassDirection(World world);
 
     public float getWindSpeedMPH(World world);
+
+    public float getWindSpeedMPH(World world, Biome[] biomes);
 }

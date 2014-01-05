@@ -3,10 +3,16 @@ package com.github.jamesnorris.mcshot;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.bukkit.Location;
+import org.bukkit.util.Vector;
 
-public class Shot { // possible hit
+import com.github.jamesnorris.mcshot.util.LineSegment3D;
+import com.github.jamesnorris.mcshot.util.Location;
+import com.github.jamesnorris.mcshot.util.MathUtility;
+import com.github.jamesnorris.mcshot.util.Plane3D;
+
+public class Shot {
     public static List<HitBox> arrangeClosest(Location from, List<HitBox> hitBoxes) {
+        /* linear sort - O(n) */
         List<HitBox> arranged = new ArrayList<HitBox>();
         for (int i = 0; i < hitBoxes.size(); i++) {
             HitBox closest = getClosest(from, hitBoxes);
@@ -18,32 +24,41 @@ public class Shot { // possible hit
 
     public static HitBox getClosest(Location from, List<HitBox> hitBoxes) {
         HitBox closest = hitBoxes.get(0);
+        double distance = distanceToHitBox(from, closest);
         for (HitBox hitBox : hitBoxes) {
-            if (getClosestCorner(from, hitBox).distance(from) < getClosestCorner(from, closest).distance(from)) {
+            if (!hitBox.getWorld().equals(from.getWorld())) {
+                continue;
+            }
+            double newDistance = distanceToHitBox(from, hitBox);
+            if (newDistance < distance) {
                 closest = hitBox;
+                distance = newDistance;
             }
         }
         return closest;
     }
 
-    public static Location getClosestCorner(Location from, HitBox hitBox) {
-        Location closest = hitBox.getCenter();
-        for (Location corner : hitBox.getCorners()) {
-            if (corner.distanceSquared(from) < closest.distanceSquared(from)) {
-                closest = corner;
+    private static double distanceToHitBox(Location from, HitBox hitBox) {
+        double distance = Double.NaN;
+        for (Plane3D plane : hitBox.getPlanes()) {
+            double newDistance = plane.getDistance(from.toVector());
+            if (distance == Double.NaN || newDistance < distance) {
+                distance = newDistance;
             }
         }
-        return closest;
+        return distance;
     }
 
-    private final int[] orderClockwise = new int[] {0, 3, 4, 1};
+    // private final int[] orderClockwise = new int[] {0, 3, 4, 1};
     private final Location from, to;
     private ShotData data;
 
     public Shot(Location from, ShotData data) {
         this.from = from;
-        to = from.clone().add(data.getDistanceToTravel() * Math.sin(Math.toRadians(from.getYaw() * -1)), data.getDistanceToTravel()
-                * Math.sin(Math.toRadians(from.getPitch() * -1)), data.getDistanceToTravel() * Math.cos(Math.toRadians(from.getYaw() * -1)));
+        to = (Location) from.clone().add(data.getDistanceToTravel()
+                * Math.sin(Math.toRadians(from.getYaw() * -1)), data.getDistanceToTravel()
+                * Math.sin(Math.toRadians(from.getPitch() * -1)), data.getDistanceToTravel()
+                * Math.cos(Math.toRadians(from.getYaw() * -1)));
         this.data = data;
     }
 
@@ -53,10 +68,6 @@ public class Shot { // possible hit
 
     public HitBox getClosest(List<HitBox> hitBoxes) {
         return getClosest(from, hitBoxes);
-    }
-
-    public Location getClosestCorner(HitBox hitBox) {
-        return getClosestCorner(from, hitBox);
     }
 
     /**
@@ -72,7 +83,8 @@ public class Shot { // possible hit
         float fromPitch = MathUtility.absDegrees(from.getPitch() * -1);
         float windCompassDirection = MathUtility.absDegrees(data.getWindCompassDirection(from.getWorld()));
         float windSpeed = data.getWindSpeedMPH(from.getWorld());
-        fromYaw += (windCompassDirection > fromYaw ? 1 : windCompassDirection < fromYaw ? -1 : 0) * windSpeed;
+        fromYaw += (windCompassDirection > fromYaw ? 1 : windCompassDirection < fromYaw ? -1 : 0)
+                * windSpeed;
         fromYaw %= 360;
         Location[] entEx = getSimpleEntranceAndExit(hitBox);
         if (entEx == null) {
@@ -102,116 +114,122 @@ public class Shot { // possible hit
      * @param hitBox The hit box to check and get extrance and exit from
      * @return A Location array containing entrance (0) and exit (1)
      */
-    public Location[] getSimpleEntranceAndExit(HitBox hitBox) {
-        // Location from = shot.getStart();
-        // Location[] hits = new Location[2];
-        // for (Plane3D plane : hitBox.getPlanes()) {
-        // Location intersect = plane.getIntersect(shot);
-        // if (intersect == null || intersect.getX() == Double.NaN || intersect.getY() == Double.NaN || intersect.getZ() == Double.NaN) {
-        // continue;
-        // }
-        // if (hits[0] == null || intersect.distanceSquared(from) < hits[0].distanceSquared(from)) {
-        // if (hits[0] != null) {
-        // hits[1] = hits[0];
-        // }
-        // hits[0] = intersect;
-        // }
-        // if (hits[1] == null) {
-        // hits[1] = intersect;
-        // }
-        // }
-        int leftViewCornerIndex = getLeftViewCornerIndex(hitBox);
-        Location origin = new Location(from.getWorld(), 0, 0, 0, 0, 0);
-        double originFromDistance = origin.distance(from);
-        double originToDistance = origin.distance(to);
-        Location leftViewCorner = getCornerClockwise(hitBox, leftViewCornerIndex);
-        Location leftFarCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 1) % 3);// always the farthest
-        Location rightFarCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 2) % 3);
-        Location rightViewCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 3) % 3);
-        double lowY = leftFarCorner.getY();
-        double highY = leftFarCorner.getY() + hitBox.getHeight();
-        Location2D fromXZ = new Location2D(from.getX(), from.getZ());
-        Location2D fromDY = new Location2D(originFromDistance, from.getY());
-        LineSegment2D farXZ = new LineSegment2D(new Location2D(leftFarCorner.getX(), leftFarCorner.getZ()), new Location2D(rightFarCorner.getX(), rightFarCorner.getZ()));
-        LineSegment2D closeXZ = new LineSegment2D(new Location2D(leftViewCorner.getX(), leftViewCorner.getZ()), new Location2D(rightViewCorner.getX(), rightViewCorner.getZ()));
-        LineSegment2D leftXZ = new LineSegment2D(new Location2D(leftViewCorner.getX(), leftViewCorner.getZ()), new Location2D(leftFarCorner.getX(), leftFarCorner.getZ()));
-        LineSegment2D rightXZ = new LineSegment2D(new Location2D(rightViewCorner.getX(), rightViewCorner.getZ()), new Location2D(rightFarCorner.getX(), rightFarCorner.getZ()));
-        LineSegment2D[] outlineXZ = new LineSegment2D[] {farXZ, closeXZ, leftXZ, rightXZ};
-        LineSegment2D shotPathXZ = new LineSegment2D(fromXZ, new Location2D(to.getX(), to.getZ()));
-        Location2D[] cfXZInter = getCloseAndFarIntersect(fromXZ, shotPathXZ, outlineXZ);
-        Location2D closeXZIntersect = cfXZInter[0];
-        Location2D farXZIntersect = cfXZInter[1];
-        double leftFarDist = leftFarCorner.distance(origin);
-        double leftViewDist = leftViewCorner.distance(origin);
-        double rightFarDist = rightFarCorner.distance(origin);
-        double rightViewDist = rightViewCorner.distance(origin);
-        LineSegment2D leftFarDY = new LineSegment2D(new Location2D(leftFarDist, lowY), new Location2D(leftFarDist, highY));
-        LineSegment2D leftViewDY = new LineSegment2D(new Location2D(leftViewDist, lowY), new Location2D(leftViewDist, highY));
-        LineSegment2D rightFarDY = new LineSegment2D(new Location2D(rightFarDist, lowY), new Location2D(rightFarDist, highY));
-        LineSegment2D rightViewDY = new LineSegment2D(new Location2D(rightViewDist, lowY), new Location2D(rightViewDist, highY));
-        LineSegment2D[] outlineDY = new LineSegment2D[] {leftFarDY, leftViewDY, rightFarDY, rightViewDY};
-        LineSegment2D shotPathDY = new LineSegment2D(fromDY, new Location2D(originToDistance, to.getY()));
-        Location2D[] cfDYInter = getCloseAndFarIntersect(fromDY, shotPathDY, outlineDY);
-        Location2D closeDYIntersect = cfDYInter[0];
-        Location2D farDYIntersect = cfDYInter[1];
-        if (closeXZIntersect == null || farXZIntersect == null || closeDYIntersect == null || farDYIntersect == null) {
-            LineSegment2D topXY = new LineSegment2D(new Location2D(hitBox.getLowestX(), highY), new Location2D(hitBox.getHighestX(), highY));
-            LineSegment2D topZY = new LineSegment2D(new Location2D(hitBox.getLowestZ(), highY), new Location2D(hitBox.getHighestZ(), highY));
-            LineSegment2D bottomXY = new LineSegment2D(new Location2D(hitBox.getLowestX(), lowY), new Location2D(hitBox.getHighestX(), lowY));
-            LineSegment2D bottomZY = new LineSegment2D(new Location2D(hitBox.getLowestZ(), lowY), new Location2D(hitBox.getHighestZ(), lowY));
-            LineSegment2D[] outlineXY = new LineSegment2D[] {topXY, bottomXY};
-            LineSegment2D[] outlineZY = new LineSegment2D[] {topZY, bottomZY};
-            Location2D fromXY = new Location2D(from.getX(), from.getY());
-            Location2D fromZY = new Location2D(from.getZ(), from.getY());
-            LineSegment2D shotPathXY = new LineSegment2D(fromXY, new Location2D(to.getX(), to.getY()));
-            LineSegment2D shotPathZY = new LineSegment2D(fromZY, new Location2D(to.getZ(), to.getY()));
-            Location2D[] cfXYInter = getCloseAndFarIntersect(fromXY, shotPathXY, outlineXY);
-            Location2D[] cfZYInter = getCloseAndFarIntersect(fromZY, shotPathZY, outlineZY);
-            Location2D closeXYIntersect = cfXYInter[0];
-            Location2D farXYIntersect = cfXYInter[1];
-            Location2D closeZYIntersect = cfZYInter[0];
-            Location2D farZYIntersect = cfZYInter[1];
-            if (closeXYIntersect != null && closeZYIntersect != null) {
-                if (closeXZIntersect == null) {
-                    closeXZIntersect = new Location2D(closeXYIntersect.getX(), closeZYIntersect.getX());
-                }
-                if (closeDYIntersect == null) {
-                    closeDYIntersect = new Location2D(fromXZ.distance(closeXZIntersect), closeXYIntersect.getY());
-                }
+    public Location[] getSimpleEntranceAndExit(HitBox hitBox) {// TODO test new algo
+        LineSegment3D shot = new LineSegment3D(from, to);// TODO new algo
+        Location from = (Location) shot.getStart().toLocation(this.from.getWorld());
+        Location[] hits = new Location[2];
+        for (Plane3D plane : hitBox.getPlanes()) {
+            Vector intersectVector = plane.getIntersect(shot);
+            if (intersectVector == null) {
+                continue;
             }
-            if (farXYIntersect != null && farZYIntersect != null) {
-                if (farXZIntersect == null) {
-                    farXZIntersect = new Location2D(farXYIntersect.getX(), farZYIntersect.getX());
-                }
-                if (farDYIntersect == null) {
-                    farDYIntersect = new Location2D(fromXZ.distance(farXZIntersect), farXYIntersect.getY());
-                }
+            Location intersect = (Location) intersectVector.toLocation(from.getWorld());
+            if (hits[0] == null) {
+                hits[0] = intersect;
+                continue;
             }
+            hits[1] = intersect;
         }
-        Location entrance = closeXZIntersect != null && closeDYIntersect != null ? new Location(from.getWorld(), closeXZIntersect.getX(), closeDYIntersect.getY(), closeXZIntersect.getY(), from.getYaw(), from.getPitch()) : null;
-        Location exit = farXZIntersect != null && farDYIntersect != null ? new Location(from.getWorld(), farXZIntersect.getX(), farDYIntersect.getY(), farXZIntersect.getY(), from.getYaw(), from.getPitch()) : null;
-        return new Location[] {entrance, exit};
+        if (hits[0].distanceSquared(from) > hits[1].distanceSquared(from)) {
+            Location temp = hits[0];
+            hits[0] = hits[1];
+            hits[1] = temp;
+        }
+        System.out.println("\n" + hits[0] + "\n" + hits[1]);
+        // int leftViewCornerIndex = getLeftViewCornerIndex(hitBox);//old algo
+        // Location origin = new Location(from.getWorld(), 0, 0, 0, 0, 0);
+        // double originFromDistance = origin.distance(from);
+        // double originToDistance = origin.distance(to);
+        // Location leftViewCorner = getCornerClockwise(hitBox, leftViewCornerIndex);
+        // Location leftFarCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 1) % 3);// always the farthest
+        // Location rightFarCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 2) % 3);
+        // Location rightViewCorner = getCornerClockwise(hitBox, (leftViewCornerIndex + 3) % 3);
+        // double lowY = leftFarCorner.getY();
+        // double highY = leftFarCorner.getY() + hitBox.getHeight();
+        // Location2D fromXZ = new Location2D(from.getX(), from.getZ());
+        // Location2D fromDY = new Location2D(originFromDistance, from.getY());
+        // LineSegment2D farXZ = new LineSegment2D(new Location2D(leftFarCorner.getX(), leftFarCorner.getZ()), new Location2D(rightFarCorner.getX(), rightFarCorner.getZ()));
+        // LineSegment2D closeXZ = new LineSegment2D(new Location2D(leftViewCorner.getX(), leftViewCorner.getZ()), new Location2D(rightViewCorner.getX(), rightViewCorner.getZ()));
+        // LineSegment2D leftXZ = new LineSegment2D(new Location2D(leftViewCorner.getX(), leftViewCorner.getZ()), new Location2D(leftFarCorner.getX(), leftFarCorner.getZ()));
+        // LineSegment2D rightXZ = new LineSegment2D(new Location2D(rightViewCorner.getX(), rightViewCorner.getZ()), new Location2D(rightFarCorner.getX(), rightFarCorner.getZ()));
+        // LineSegment2D[] outlineXZ = new LineSegment2D[] {farXZ, closeXZ, leftXZ, rightXZ};
+        // LineSegment2D shotPathXZ = new LineSegment2D(fromXZ, new Location2D(to.getX(), to.getZ()));
+        // Location2D[] cfXZInter = getCloseAndFarIntersect(fromXZ, shotPathXZ, outlineXZ);
+        // Location2D closeXZIntersect = cfXZInter[0];
+        // Location2D farXZIntersect = cfXZInter[1];
+        // double leftFarDist = leftFarCorner.distance(origin);
+        // double leftViewDist = leftViewCorner.distance(origin);
+        // double rightFarDist = rightFarCorner.distance(origin);
+        // double rightViewDist = rightViewCorner.distance(origin);
+        // LineSegment2D leftFarDY = new LineSegment2D(new Location2D(leftFarDist, lowY), new Location2D(leftFarDist, highY));
+        // LineSegment2D leftViewDY = new LineSegment2D(new Location2D(leftViewDist, lowY), new Location2D(leftViewDist, highY));
+        // LineSegment2D rightFarDY = new LineSegment2D(new Location2D(rightFarDist, lowY), new Location2D(rightFarDist, highY));
+        // LineSegment2D rightViewDY = new LineSegment2D(new Location2D(rightViewDist, lowY), new Location2D(rightViewDist, highY));
+        // LineSegment2D[] outlineDY = new LineSegment2D[] {leftFarDY, leftViewDY, rightFarDY, rightViewDY};
+        // LineSegment2D shotPathDY = new LineSegment2D(fromDY, new Location2D(originToDistance, to.getY()));
+        // Location2D[] cfDYInter = getCloseAndFarIntersect(fromDY, shotPathDY, outlineDY);
+        // Location2D closeDYIntersect = cfDYInter[0];
+        // Location2D farDYIntersect = cfDYInter[1];
+        // if (closeXZIntersect == null || farXZIntersect == null || closeDYIntersect == null || farDYIntersect == null) {
+        // LineSegment2D topXY = new LineSegment2D(new Location2D(hitBox.getLowestX(), highY), new Location2D(hitBox.getHighestX(), highY));
+        // LineSegment2D topZY = new LineSegment2D(new Location2D(hitBox.getLowestZ(), highY), new Location2D(hitBox.getHighestZ(), highY));
+        // LineSegment2D bottomXY = new LineSegment2D(new Location2D(hitBox.getLowestX(), lowY), new Location2D(hitBox.getHighestX(), lowY));
+        // LineSegment2D bottomZY = new LineSegment2D(new Location2D(hitBox.getLowestZ(), lowY), new Location2D(hitBox.getHighestZ(), lowY));
+        // LineSegment2D[] outlineXY = new LineSegment2D[] {topXY, bottomXY};
+        // LineSegment2D[] outlineZY = new LineSegment2D[] {topZY, bottomZY};
+        // Location2D fromXY = new Location2D(from.getX(), from.getY());
+        // Location2D fromZY = new Location2D(from.getZ(), from.getY());
+        // LineSegment2D shotPathXY = new LineSegment2D(fromXY, new Location2D(to.getX(), to.getY()));
+        // LineSegment2D shotPathZY = new LineSegment2D(fromZY, new Location2D(to.getZ(), to.getY()));
+        // Location2D[] cfXYInter = getCloseAndFarIntersect(fromXY, shotPathXY, outlineXY);
+        // Location2D[] cfZYInter = getCloseAndFarIntersect(fromZY, shotPathZY, outlineZY);
+        // Location2D closeXYIntersect = cfXYInter[0];
+        // Location2D farXYIntersect = cfXYInter[1];
+        // Location2D closeZYIntersect = cfZYInter[0];
+        // Location2D farZYIntersect = cfZYInter[1];
+        // if (closeXYIntersect != null && closeZYIntersect != null) {
+        // if (closeXZIntersect == null) {
+        // closeXZIntersect = new Location2D(closeXYIntersect.getX(), closeZYIntersect.getX());
+        // }
+        // if (closeDYIntersect == null) {
+        // closeDYIntersect = new Location2D(fromXZ.distance(closeXZIntersect), closeXYIntersect.getY());
+        // }
+        // }
+        // if (farXYIntersect != null && farZYIntersect != null) {
+        // if (farXZIntersect == null) {
+        // farXZIntersect = new Location2D(farXYIntersect.getX(), farZYIntersect.getX());
+        // }
+        // if (farDYIntersect == null) {
+        // farDYIntersect = new Location2D(fromXZ.distance(farXZIntersect), farXYIntersect.getY());
+        // }
+        // }
+        // }
+        // Location entrance = closeXZIntersect != null && closeDYIntersect != null ? new Location(from.getWorld(), closeXZIntersect.getX(), closeDYIntersect.getY(),
+        // closeXZIntersect.getY(), from.getYaw(), from.getPitch()) : null;
+        // Location exit = farXZIntersect != null && farDYIntersect != null ? new Location(from.getWorld(), farXZIntersect.getX(), farDYIntersect.getY(), farXZIntersect.getY(),
+        // from.getYaw(), from.getPitch()) : null;
+        return hits;
     }
 
-    public boolean hits(HitBox hitBox, Location entrance, Location exit) {
-        if (hitBox == null || entrance == null || exit == null) {
-            return false;
-        }
-        Location mid = new Location(entrance.getWorld(), (entrance.getX() + exit.getX()) / 2, (entrance.getY() + exit.getY()) / 2, (entrance.getZ() + exit.getZ()) / 2, entrance.getYaw(), entrance.getPitch());
-        boolean Xs = MathUtility.overlap1D(hitBox.getLowestX(), hitBox.getHighestX(), mid.getX(), mid.getX());
-        boolean Ys = MathUtility.overlap1D(hitBox.getLowestY(), hitBox.getHighestY(), mid.getY(), mid.getY());
-        boolean Zs = MathUtility.overlap1D(hitBox.getLowestZ(), hitBox.getHighestZ(), mid.getZ(), mid.getZ());
-        return Xs && Ys && Zs;
-    }
-
-    public boolean hits(HitBox hitBox, Location[] entEx) {
-        if (entEx == null) {
-            return false;
-        }
-        return hits(hitBox, entEx[0], entEx[1]);
-    }
-
-    /* TODO Checking for obstacles
+    // public boolean hits(HitBox hitBox, Location entrance, Location exit) {
+    // if (hitBox == null || entrance == null || exit == null) {
+    // return false;
+    // }
+    // Location mid = new Location(entrance.getWorld(), (entrance.getX() + exit.getX()) / 2, (entrance.getY() + exit.getY()) / 2, (entrance.getZ() + exit.getZ()) / 2,
+    // entrance.getYaw(), entrance.getPitch());
+    // boolean Xs = MathUtility.overlap1D(hitBox.getLowestX(), hitBox.getHighestX(), mid.getX(), mid.getX());
+    // boolean Ys = MathUtility.overlap1D(hitBox.getLowestY(), hitBox.getHighestY(), mid.getY(), mid.getY());
+    // boolean Zs = MathUtility.overlap1D(hitBox.getLowestZ(), hitBox.getHighestZ(), mid.getZ(), mid.getZ());
+    // return Xs && Ys && Zs;
+    // }
+    //
+    // public boolean hits(HitBox hitBox, Location[] entEx) {
+    // if (entEx == null) {
+    // return false;
+    // }
+    // return hits(hitBox, entEx[0], entEx[1]);
+    // }
+    /* TODO Checking for obstacles (users use hit boxes for this purpose?)
      * TODO Only allow parts of the HitBox to be hit that are in range
      * TODO Speed in Blocks Per Second, as contained in ShotData
      * TODO Projectile penetration */
@@ -219,7 +237,7 @@ public class Shot { // possible hit
         List<Hit> hits = new ArrayList<Hit>();
         for (HitBox hitBox : hitBoxes) {
             hitBox.update();
-            if (getClosestCorner(hitBox).distanceSquared(from) > Math.pow(data.getDistanceToTravel(), 2)) {
+            if (hitBox.getCenter().toLocation(hitBox.getWorld()).distanceSquared(from) > Math.pow(data.getDistanceToTravel(), 2)) {
                 continue;
             }
             Location[] entEx = getSimpleEntranceAndExit(hitBox);// TODO complex
@@ -229,51 +247,50 @@ public class Shot { // possible hit
             if (entEx[0] == null) {
                 continue;
             }
-            hits.add(new Hit(from, entEx[0], entEx[1], hitBox, data));
+            hits.add(new Hit(from, to, entEx[0], entEx[1], data, hitBox));
         }
         return hits;
     }
-
-    private Location2D[] getCloseAndFarIntersect(Location2D from, LineSegment2D shotPath, LineSegment2D[] outline) {
-        double distSq = Double.MAX_VALUE;
-        Location2D closeIntersect = null;
-        Location2D farIntersect = null;
-        for (LineSegment2D segment : outline) {
-            Location2D intersect = segment.getIntersect(shotPath);
-            if (intersect == null) {
-                continue;
-            }
-            double currentDistSq = from.distanceSquared(intersect);
-            if (farIntersect != null && from.distanceSquared(farIntersect) <= distSq) {
-                Location2D temporary = closeIntersect;
-                closeIntersect = farIntersect;
-                farIntersect = temporary;
-            }
-            if (currentDistSq < distSq) {
-                distSq = currentDistSq;
-                farIntersect = closeIntersect;
-                closeIntersect = intersect;
-            }
-        }
-        return new Location2D[] {closeIntersect, farIntersect};
-    }
-
-    private Location getCornerClockwise(HitBox hitBox, int index) {
-        return hitBox.getCorner(orderClockwise[index]);
-    }
-
-    private int getLeftViewCornerIndex(HitBox hitBox) {
-        double leftViewCornerYaw = 0;
-        int leftViewCornerIndex = 0;
-        for (int index = 0; index < orderClockwise.length; index++) {
-            int number = orderClockwise[index];
-            Location corner = hitBox.getCorner(number);
-            double yawToCorner = Math.atan2(corner.getX() - from.getX(), corner.getZ() - from.getZ()) * 180 / Math.PI;// flipped x and z from normal
-            if (yawToCorner > leftViewCornerYaw || Math.abs(yawToCorner - leftViewCornerYaw) > 180) {
-                leftViewCornerYaw = yawToCorner;
-                leftViewCornerIndex = index;
-            }
-        }
-        return leftViewCornerIndex;
-    }
+    // private Location2D[] getCloseAndFarIntersect(Location2D from, LineSegment2D shotPath, LineSegment2D[] outline) {
+    // double distSq = Double.MAX_VALUE;
+    // Location2D closeIntersect = null;
+    // Location2D farIntersect = null;
+    // for (LineSegment2D segment : outline) {
+    // Location2D intersect = segment.getIntersect(shotPath);
+    // if (intersect == null) {
+    // continue;
+    // }
+    // double currentDistSq = from.distanceSquared(intersect);
+    // if (farIntersect != null && from.distanceSquared(farIntersect) <= distSq) {
+    // Location2D temporary = closeIntersect;
+    // closeIntersect = farIntersect;
+    // farIntersect = temporary;
+    // }
+    // if (currentDistSq < distSq) {
+    // distSq = currentDistSq;
+    // farIntersect = closeIntersect;
+    // closeIntersect = intersect;
+    // }
+    // }
+    // return new Location2D[] {closeIntersect, farIntersect};
+    // }
+    //
+    // private Location getCornerClockwise(HitBox hitBox, int index) {
+    // return hitBox.getCorner(orderClockwise[index]);
+    // }
+    //
+    // private int getLeftViewCornerIndex(HitBox hitBox) {
+    // double leftViewCornerYaw = 0;
+    // int leftViewCornerIndex = 0;
+    // for (int index = 0; index < orderClockwise.length; index++) {
+    // int number = orderClockwise[index];
+    // Location corner = hitBox.getCorner(number);
+    // double yawToCorner = Math.atan2(corner.getX() - from.getX(), corner.getZ() - from.getZ()) * 180 / Math.PI;// flipped x and z from normal
+    // if (yawToCorner > leftViewCornerYaw || Math.abs(yawToCorner - leftViewCornerYaw) > 180) {
+    // leftViewCornerYaw = yawToCorner;
+    // leftViewCornerIndex = index;
+    // }
+    // }
+    // return leftViewCornerIndex;
+    // }
 }

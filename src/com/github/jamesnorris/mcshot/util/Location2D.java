@@ -1,4 +1,4 @@
-package com.github.jamesnorris.mcshot;
+package com.github.jamesnorris.mcshot.util;
 
 public class Location2D {
     private double x, y;
@@ -22,6 +22,13 @@ public class Location2D {
 
     public double getY() {
         return y;
+    }
+
+    public Location2D rotate(float degrees) {
+        double rads = Math.toRadians(degrees);
+        x = x * Math.cos(rads) - y * Math.sin(rads);
+        y = x * Math.sin(rads) + y * Math.cos(rads);
+        return this;
     }
 
     @Override public String toString() {

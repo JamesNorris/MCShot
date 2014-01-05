@@ -1,7 +1,15 @@
-package com.github.jamesnorris.mcshot;
+package com.github.jamesnorris.mcshot.util;
 
 public class LineSegment2D {
-    public static Location2D getIntersect(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4) {
+    public static Location2D getIntersect(LineSegment2D line1, LineSegment2D line2) {
+        Location2D start1 = line1.getStart();
+        Location2D end1 = line1.getEnd();
+        Location2D start2 = line2.getStart();
+        Location2D end2 = line2.getEnd();
+        return getIntersect(start1.getX(), start1.getY(), end1.getX(), end1.getY(), start2.getX(), start2.getY(), end2.getX(), end2.getY());
+    }
+
+    protected static Location2D getIntersect(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4) {
         double denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
         if (denom == 0.0D) { // parallel
             return null;
@@ -12,14 +20,6 @@ public class LineSegment2D {
             return new Location2D(x1 + ua * (x2 - x1), y1 + ua * (y2 - y1));
         }
         return null;
-    }
-
-    public static Location2D getIntersect(LineSegment2D line1, LineSegment2D line2) {
-        Location2D start1 = line1.getStart();
-        Location2D end1 = line1.getEnd();
-        Location2D start2 = line2.getStart();
-        Location2D end2 = line2.getEnd();
-        return getIntersect(start1.getX(), start1.getY(), end1.getX(), end1.getY(), start2.getX(), start2.getY(), end2.getX(), end2.getY());
     }
 
     private double x1, x2, y1, y2;
@@ -49,5 +49,10 @@ public class LineSegment2D {
 
     public Location2D getStart() {
         return new Location2D(x1, y1);
+    }
+
+    @Override public String toString() {
+        return "LineSegment2D:(from: (" + x1 + ", " + y1 + "), to: (" + x2
+                + ", " + y2 + "))";
     }
 }

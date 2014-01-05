@@ -2,53 +2,35 @@ package com.github.jamesnorris.mcshot;
 
 import java.util.UUID;
 
-import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.util.Vector;
 
-public class DataZone {
+import com.github.jamesnorris.mcshot.util.Location;
+
+public class DataZone extends Zone {
     private final UUID uuid = UUID.randomUUID();
-    public double widthFrom, widthTo, heightFrom, heightTo, lengthFrom, lengthTo;
-    private double multiplier, thickness;
+    private World world;
+    public double multiplier, distanceMultiplier;
 
-    public DataZone(double widthFrom, double widthTo, double heightFrom, double heightTo, double lengthFrom, double lengthTo) {
-        this(widthFrom, widthTo, heightFrom, heightTo, lengthFrom, lengthTo, 1, 1);
+    public DataZone(Location from, Location to, double distanceMultiplier, double thickness) {
+        this(from.getWorld(), from.toVector(), to.toVector(), distanceMultiplier, thickness);
+        if (!from.getWorld().equals(to.getWorld())) {
+            throw new IllegalArgumentException("From and to must be in the same world.");
+        }
     }
 
-    public DataZone(double widthFrom, double widthTo, double heightFrom, double heightTo, double lengthFrom, double lengthTo, double multiplier, double thickness) {
-        this.widthFrom = widthFrom;
-        this.widthTo = widthTo;
-        this.heightFrom = heightFrom;
-        this.heightTo = heightTo;
-        this.lengthFrom = lengthFrom;
-        this.lengthTo = lengthTo;
+    public DataZone(World world, Vector from, Vector to, double multiplier, double distanceMultiplier) {
+        super(from, to);
+        this.world = world;
         this.multiplier = multiplier;
-        this.thickness = thickness;
-    }
-
-    public DataZone(Location lowest, Location highest) {
-        this(lowest.getX(), highest.getX(), lowest.getY(), highest.getY(), lowest.getZ(), highest.getZ(), 1, 1);
-    }
-
-    public DataZone(Location lowest, Location highest, double multiplier, double thickness) {
-        this(lowest.getX(), highest.getX(), lowest.getY(), highest.getY(), lowest.getZ(), highest.getZ(), multiplier, thickness);
-    }
-
-    public double getMultiplier() {
-        return multiplier;
-    }
-
-    public double getThickness() {
-        return thickness;
+        this.distanceMultiplier = distanceMultiplier;
     }
 
     public UUID getUUID() {
         return uuid;
     }
 
-    public void setMultiplier(double multiplier) {
-        this.multiplier = multiplier;
-    }
-
-    public void setThickness(double thickness) {
-        this.thickness = thickness;
+    public World getWorld() {
+        return world;
     }
 }
